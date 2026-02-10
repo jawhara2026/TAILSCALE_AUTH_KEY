@@ -1,0 +1,60 @@
+name: Jowhara RDP Final
+
+on:
+  workflow_dispatch:
+
+jobs:
+  start-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360 # 6 
+
+    steps:
+     
+      - name: 1. Create User & Enable RDP
+        run: |
+         
+          $Username = "JowharaUser"
+          $Password = "${{ secrets.RDP_PASSWORD }}"
+          
+         
+          if (-not $Password) {
+            Write-Error "Error: RDP_PASSWORD secret is missing!"
+            exit 1
+          }
+
+          $SecurePass = ConvertTo-SecureString $Password -AsPlainText -Force
+          New-LocalUser -Name $Username -Password $SecurePass -Description "Jowhara Admin"
+          Add-LocalGroupMember -Group "Administrators" -Member $Username
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member $Username
+
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          
+          Write-Host "✅ User Created and RDP Enabled."
+
+      - name: 2. Connect Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          hostname: Jowhara-PC
+          tags: tag:ci
+
+      - name: 3. Show IP Address
+        run: |
+          $ip = tailscale ip -4
+          Write-Host " "
+          Write-Host "=================================================="
+          Write-Host "✅ MAQUINE IS READY (
+          Write-Host "👉 IP Address : $ip"
+          Write-Host "👉 Username   : JowharaUser"
+          Write-Host "👉 Password   : (jawhara@2026 Secret)"
+          Write-Host "=================================================="
+          Write-Host " "
+
+     
+      - name: 4. Keep Alive
+        run: |
+          Write-Host "RDP is running... Don't cancel this job."
+          while ($true) {
+            Start-Sleep -Seconds 60
+          }
